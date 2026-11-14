@@ -1,0 +1,102 @@
+---
+import Logo from './Logo.astro';
+import GithubIcon from './GithubIcon.astro';
+import { projects } from '../data/projects';
+import { projectUrl, homeUrl } from '../lib/urls';
+interface Props { current?: string }
+const { current } = Astro.props;
+---
+<nav class="rail" aria-label="Projects">
+  <a href={homeUrl()} class:list={['icon', 'home', { active: !current }]} data-tip="desquerteur – home" aria-label="Home">
+    <Logo size={46} />
+  </a>
+  <span class="sep" aria-hidden="true"></span>
+  {projects.map((p) => (
+    <a
+      href={projectUrl(p.slug)}
+      class:list={['icon', { active: current === p.slug }]}
+      style={`--c:${p.color}`}
+      data-tip={p.name}
+      aria-label={p.name}
+      aria-current={current === p.slug ? 'page' : undefined}
+    >
+      <span>{p.mark}</span>
+    </a>
+  ))}
+  <span class="sep" aria-hidden="true"></span>
+  <a href="https://github.com/desquerteur" class="icon gh" data-tip="GitHub" aria-label="GitHub profile">
+    <GithubIcon size={22} />
+  </a>
+</nav>
+
+<style>
+  .rail {
+    position: fixed; left: 0; top: 0; bottom: 0; width: var(--rail);
+    display: flex; flex-direction: column; align-items: center; gap: 8px;
+    padding: 12px 0; background: rgba(11, 8, 23, 0.82);
+    backdrop-filter: blur(14px); border-right: 1px solid var(--border);
+    overflow-y: auto; overflow-x: visible; scrollbar-width: none; z-index: 50;
+  }
+  .rail::-webkit-scrollbar { display: none; }
+  .icon {
+    position: relative; flex: none;
+    width: 48px; height: 48px; border-radius: 50%;
+    display: grid; place-items: center;
+    background: var(--surface-2); color: var(--c, var(--text));
+    font-family: var(--font-head); font-weight: 700; font-size: 0.95rem;
+    transition: border-radius 220ms var(--ease), background 160ms ease, color 160ms ease;
+  }
+  .icon.home { background: transparent; }
+  .icon:hover, .icon.active { border-radius: 16px; background: var(--c, var(--blurple)); color: #05030b; }
+  .icon.home:hover, .icon.home.active { background: rgba(88, 101, 242, 0.25); }
+  .icon.gh { color: var(--muted); }
+  .icon.gh:hover { background: var(--teal); color: #05030b; }
+  .icon::before {
+    content: ''; position: absolute; left: -14px; width: 4px; height: 8px;
+    border-radius: 0 4px 4px 0; background: #fff; opacity: 0;
+    transition: height 220ms var(--ease), opacity 160ms ease;
+  }
+  .icon:hover::before { opacity: 1; height: 20px; }
+  .icon.active::before { opacity: 1; height: 40px; }
+  .sep { width: 32px; height: 2px; border-radius: 1px; background: var(--border); flex: none; margin: 2px 0; }
+
+  @media (max-width: 760px) {
+    .rail {
+      top: auto; bottom: 0; right: 0; width: auto; height: 68px;
+      flex-direction: row; justify-content: flex-start; padding: 0 12px;
+      border-right: 0; border-top: 1px solid var(--border); overflow-x: auto; overflow-y: hidden;
+    }
+    .icon { width: 44px; height: 44px; }
+    .icon::before { display: none; }
+    .sep { width: 2px; height: 28px; }
+  }
+</style>
+
+<!-- Discord-style tooltip: one floating element, positioned next to the hovered icon. -->
+<div class="rail-tip" role="tooltip" hidden></div>
+<style is:global>
+  .rail-tip {
+    position: fixed; z-index: 60; left: calc(var(--rail) + 6px);
+    padding: 6px 10px; border-radius: 6px; background: #000; color: #fff;
+    font: 600 0.85rem var(--font-body); white-space: nowrap; pointer-events: none;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5); transform: translateY(-50%);
+  }
+  @media (max-width: 760px) { .rail-tip { display: none; } }
+</style>
+<script>
+  const tip = document.querySelector<HTMLElement>('.rail-tip');
+  document.querySelectorAll<HTMLElement>('.rail .icon').forEach((el) => {
+    const show = () => {
+      if (!tip) return;
+      const r = el.getBoundingClientRect();
+      tip.textContent = el.dataset.tip ?? '';
+      tip.style.top = `${r.top + r.height / 2}px`;
+      tip.hidden = false;
+    };
+    const hide = () => { if (tip) tip.hidden = true; };
+    el.addEventListener('mouseenter', show);
+    el.addEventListener('focus', show);
+    el.addEventListener('mouseleave', hide);
+    el.addEventListener('blur', hide);
+  });
+</script>

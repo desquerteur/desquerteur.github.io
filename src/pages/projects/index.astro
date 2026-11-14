@@ -1,0 +1,55 @@
+---
+// The full project file: every project with filters by category.
+import Base from '../../layouts/Base.astro';
+import EmbedCard from '../../components/EmbedCard.astro';
+import { projects, categories } from '../../data/projects';
+---
+<Base
+  title="Project file – desquerteur"
+  description="Every project by desquerteur: car software, Android, Minecraft, web apps, hardware and AI tooling."
+  channel="project-file"
+  topic={`${projects.length} projects – each one has its own page.`}
+>
+  <section class="section">
+    <div class="section-head reveal">
+      <h1><span class="hash">#</span>project-file</h1>
+    </div>
+    <div class="filters reveal" role="toolbar" aria-label="Filter by category">
+      <button class="chip on" data-cat="all" aria-pressed="true">All · {projects.length}</button>
+      {categories.map((c) => (
+        <button class="chip" data-cat={c} aria-pressed="false">{c} · {projects.filter((p) => p.category === c).length}</button>
+      ))}
+    </div>
+    <div class="grid">
+      {projects.map((p) => (
+        <div class="cell" data-cat={p.category}><EmbedCard project={p} /></div>
+      ))}
+    </div>
+  </section>
+</Base>
+
+<script>
+  const buttons = document.querySelectorAll<HTMLButtonElement>('.filters button');
+  const cells = document.querySelectorAll<HTMLElement>('.cell');
+  buttons.forEach((b) =>
+    b.addEventListener('click', () => {
+      const cat = b.dataset.cat;
+      buttons.forEach((x) => { x.classList.toggle('on', x === b); x.setAttribute('aria-pressed', String(x === b)); });
+      cells.forEach((c) => { c.hidden = cat !== 'all' && c.dataset.cat !== cat; });
+    }),
+  );
+</script>
+
+<style>
+  h1 { font-size: clamp(1.8rem, 4vw, 2.6rem); }
+  h1 .hash { color: var(--faint); font-family: var(--font-mono); font-weight: 400; margin-right: 6px; }
+  .filters { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: var(--s-6); }
+  .filters button { cursor: pointer; font-size: 0.82rem; padding: 6px 12px; transition: border-color 160ms ease, color 160ms ease, background 160ms ease; }
+  .filters button:hover { color: var(--text); border-color: var(--purple-hi); }
+  .filters button.on { background: var(--blurple); border-color: var(--blurple); color: #fff; }
+  .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--s-5); }
+  .cell { display: flex; }
+  .cell > :global(*) { flex: 1; }
+  @media (max-width: 1000px) { .grid { grid-template-columns: repeat(2, 1fr); } }
+  @media (max-width: 620px) { .grid { grid-template-columns: 1fr; } }
+</style>

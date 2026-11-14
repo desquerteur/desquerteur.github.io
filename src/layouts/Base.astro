@@ -1,0 +1,91 @@
+---
+import '../styles/global.css';
+import Starfield from '../components/Starfield.astro';
+import ServerRail from '../components/ServerRail.astro';
+import GithubIcon from '../components/GithubIcon.astro';
+import { homeUrl } from '../lib/urls';
+
+interface Props {
+  title: string;
+  description: string;
+  channel: string;
+  topic?: string;
+  current?: string;
+  image?: string;
+}
+const { title, description, channel, topic, current, image = '/og.png' } = Astro.props;
+const canonical = new URL(Astro.url.pathname, Astro.site);
+const ogImage = new URL(image, Astro.site);
+---
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{title}</title>
+    <meta name="description" content={description} />
+    <link rel="canonical" href={canonical} />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <meta name="theme-color" content="#05030b" />
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content={title} />
+    <meta property="og:description" content={description} />
+    <meta property="og:image" content={ogImage} />
+    <meta name="twitter:card" content="summary_large_image" />
+  </head>
+  <body>
+    <a class="skip" href="#main">Skip to content</a>
+    <Starfield />
+    <ServerRail current={current} />
+    <div class="app">
+      <header class="channel-bar">
+        <a href={homeUrl()} class="channel"><span class="hash" aria-hidden="true">#</span>{channel}</a>
+        {topic && <span class="topic">{topic}</span>}
+        <nav class="bar-links" aria-label="Main">
+          <a href={homeUrl('#about')}>About</a>
+          <a href={homeUrl('#projects')}>Projects</a>
+          <a href="https://github.com/desquerteur" aria-label="GitHub"><GithubIcon size={18} /></a>
+        </nav>
+      </header>
+      <main id="main">
+        <slot />
+      </main>
+      <footer class="foot">
+        <span>Built by <a href={homeUrl()}>desquerteur</a> with Astro, Claude Code and Codex.</span>
+        <span class="mono">© {new Date().getFullYear()}</span>
+      </footer>
+    </div>
+    <script>
+      const io = new IntersectionObserver(
+        (entries) => entries.forEach((e) => { if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); } }),
+        { rootMargin: '0px 0px -8% 0px' },
+      );
+      document.querySelectorAll('.reveal').forEach((el) => io.observe(el));
+    </script>
+  </body>
+</html>
+
+<style>
+  .app { margin-left: var(--rail); min-height: 100vh; display: flex; flex-direction: column; }
+  .channel-bar {
+    position: sticky; top: 0; z-index: 40;
+    display: flex; align-items: center; gap: var(--s-4);
+    height: 52px; padding: 0 var(--s-5);
+    background: rgba(11, 8, 23, 0.72); backdrop-filter: blur(14px);
+    border-bottom: 1px solid var(--border);
+  }
+  .channel { font: 600 1rem var(--font-head); color: var(--text); display: flex; align-items: center; gap: 6px; white-space: nowrap; }
+  .channel .hash { color: var(--faint); font-size: 1.3rem; font-weight: 400; }
+  .topic { color: var(--muted); font-size: 0.88rem; padding-left: var(--s-4); border-left: 1px solid var(--border); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+  .bar-links { margin-left: auto; display: flex; align-items: center; gap: var(--s-5); font-size: 0.9rem; font-weight: 500; }
+  .bar-links a { color: var(--muted); display: inline-flex; }
+  .bar-links a:hover { color: var(--text); }
+  main { flex: 1; width: 100%; max-width: var(--max); margin: 0 auto; padding: 0 var(--s-6); }
+  .foot { display: flex; justify-content: space-between; gap: var(--s-4); flex-wrap: wrap; max-width: var(--max); width: 100%; margin: 0 auto; padding: var(--s-6); color: var(--faint); font-size: 0.85rem; border-top: 1px solid var(--border); }
+  @media (max-width: 760px) {
+    .app { margin-left: 0; padding-bottom: 68px; }
+    .topic { display: none; }
+    .channel-bar { padding: 0 var(--s-4); }
+    main { padding: 0 var(--s-4); }
+  }
+</style>

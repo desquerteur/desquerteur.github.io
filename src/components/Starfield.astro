@@ -1,0 +1,57 @@
+---
+// Deterministic star layers (seeded), rendered as box-shadows – no JS, no images.
+function rng(seed: number) {
+  return () => {
+    seed = (seed * 1664525 + 1013904223) % 4294967296;
+    return seed / 4294967296;
+  };
+}
+function layer(count: number, seed: number) {
+  const r = rng(seed);
+  const tints = ['#ffffff', '#ffffff', '#ffffff', '#c4b5fd', '#99f6e4', '#f5d0fe'];
+  return Array.from({ length: count }, () => {
+    const x = Math.round(r() * 2400);
+    const y = Math.round(r() * 2400);
+    return `${x}px ${y}px ${tints[Math.floor(r() * tints.length)]}`;
+  }).join(',');
+}
+const small = layer(520, 7);
+const medium = layer(160, 42);
+const large = layer(55, 1337);
+---
+<div class="sky" aria-hidden="true">
+  <div class="nebula"></div>
+  <div class="stars s1" style={`--shadow:${small}`}></div>
+  <div class="stars s2" style={`--shadow:${medium}`}></div>
+  <div class="stars s3" style={`--shadow:${large}`}></div>
+</div>
+
+<style>
+  .sky { position: fixed; inset: 0; z-index: -1; overflow: hidden; background: var(--bg); pointer-events: none; }
+  .nebula {
+    position: absolute; inset: -20%;
+    background:
+      radial-gradient(40% 35% at 18% 12%, rgba(139, 92, 246, 0.35), transparent 70%),
+      radial-gradient(35% 30% at 85% 85%, rgba(46, 230, 214, 0.18), transparent 70%),
+      radial-gradient(30% 25% at 55% 50%, rgba(217, 70, 239, 0.12), transparent 70%),
+      radial-gradient(25% 20% at 90% 20%, rgba(88, 101, 242, 0.2), transparent 70%);
+    filter: blur(20px);
+    animation: breathe 24s ease-in-out infinite alternate;
+  }
+  .stars {
+    position: absolute; top: 0; left: 0;
+    border-radius: 50%;
+    box-shadow: var(--shadow);
+    animation: drift linear infinite;
+  }
+  .stars::after {
+    content: ''; position: absolute; top: 2400px; left: 0;
+    width: inherit; height: inherit; border-radius: 50%;
+    box-shadow: var(--shadow);
+  }
+  .s1 { width: 1px; height: 1px; opacity: 0.7; animation-duration: 180s; }
+  .s2 { width: 2px; height: 2px; opacity: 0.8; animation-duration: 260s; }
+  .s3 { width: 3px; height: 3px; opacity: 0.9; animation-duration: 340s; filter: drop-shadow(0 0 3px #c4b5fd); }
+  @keyframes drift { to { transform: translateY(-2400px); } }
+  @keyframes breathe { from { transform: scale(1) rotate(0deg); } to { transform: scale(1.08) rotate(3deg); } }
+</style>

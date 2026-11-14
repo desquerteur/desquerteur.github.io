@@ -1,0 +1,20 @@
+---
+import Base from '../layouts/Base.astro';
+import { homeUrl } from '../lib/urls';
+---
+<Base title="Lost in space – desquerteur" description="This page drifted off into the void." channel="lost-in-space">
+  <section class="lost">
+    <p class="code mono">404</p>
+    <h1>This channel drifted into the void.</h1>
+    <p>The page you are looking for does not exist (anymore).</p>
+    <a class="btn btn-primary" href={homeUrl()}>Fly back home</a>
+  </section>
+</Base>
+
+<style>
+  .lost { min-height: 70vh; display: grid; place-content: center; text-align: center; gap: var(--s-4); }
+  .code { font-size: 5rem; margin: 0; background: var(--gradient); -webkit-background-clip: text; background-clip: text; color: transparent; font-weight: 700; }
+  h1 { font-size: clamp(1.6rem, 4vw, 2.4rem); }
+  p { color: var(--muted); }
+  .btn { justify-self: center; }
+</style>

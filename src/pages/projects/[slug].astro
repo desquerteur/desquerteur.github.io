@@ -1,0 +1,172 @@
+---
+// One page per project. In production each page is served on <slug>.desquerteur.com
+// by the Cloudflare Worker (worker/index.js); on GitHub Pages it lives at /projects/<slug>/.
+import Base from '../../layouts/Base.astro';
+import GithubIcon from '../../components/GithubIcon.astro';
+import { projects, statusLabel, type Project } from '../../data/projects';
+import { projectUrl, homeUrl, projectHost } from '../../lib/urls';
+
+export function getStaticPaths() {
+  return projects.map((p, i) => ({
+    params: { slug: p.slug },
+    props: { project: p, prev: projects[(i - 1 + projects.length) % projects.length], next: projects[(i + 1) % projects.length] },
+  }));
+}
+
+interface Props { project: Project; prev: Project; next: Project }
+const { project: p, prev, next } = Astro.props;
+const image = p.shots?.[0]?.src ?? p.video?.poster;
+---
+<Base
+  title={`${p.name} – a project by desquerteur`}
+  description={p.tagline}
+  channel={p.slug}
+  topic={p.tagline}
+  current={p.slug}
+  image={image}
+>
+  <div class="page" style={`--c:${p.color}`}>
+    <a class="back reveal" href={homeUrl()}>← Back to desquerteur.com – meet the developer</a>
+
+    <section class="phero reveal">
+      <span class="pmark" aria-hidden="true">{p.mark}</span>
+      <div>
+        <p class="host mono">{projectHost(p.slug)}</p>
+        <h1>{p.name}</h1>
+        <p class="tagline">{p.tagline}</p>
+        <div class="meta">
+          <span class:list={['status', `status-${p.status}`]}>{statusLabel[p.status]}</span>
+          <span class="chip">{p.category}</span>
+          <span class="chip">{p.year}</span>
+        </div>
+        <div class="actions">
+          {p.repo && <a class="btn btn-primary" href={p.repo}><GithubIcon size={18} /> Source on GitHub</a>}
+          {p.links?.map((l) => <a class="btn btn-ghost" href={l.href}>{l.label}</a>)}
+        </div>
+      </div>
+    </section>
+
+    {(p.credit || p.note) && (
+      <div class="callouts reveal">
+        {p.credit && <p class="callout"><strong>Credit:</strong> {p.credit}</p>}
+        {p.note && <p class="callout"><strong>Note:</strong> {p.note}</p>}
+      </div>
+    )}
+
+    {p.video && (
+      <section class="video reveal" aria-label={p.video.label}>
+        <video controls preload="none" playsinline poster={p.video.poster} src={p.video.src}></video>
+        <p class="label vlabel">▶ {p.video.label}</p>
+      </section>
+    )}
+
+    <section class="cols">
+      <div class="about reveal">
+        <h2><span class="hash">#</span>about</h2>
+        {p.description.map((d) => <p>{d}</p>)}
+        <h2 class="mt"><span class="hash">#</span>features</h2>
+        <ul class="features">
+          {p.features.map((f) => <li>{f}</li>)}
+        </ul>
+      </div>
+      <aside class="side reveal">
+        <div class="field">
+          <p class="label">Built with</p>
+          <ul class="chips">{p.stack.map((s) => <li class="chip">{s}</li>)}</ul>
+        </div>
+        <div class="field">
+          <p class="label">Developer</p>
+          <a href={homeUrl('#about')} class="dev">
+            <span class="devdot" aria-hidden="true"></span> Noriel · desquerteur
+          </a>
+        </div>
+        {p.repo && (
+          <div class="field">
+            <p class="label">Repository</p>
+            <a href={p.repo} class="mono small">{p.repo.replace('https://github.com/', '')}</a>
+          </div>
+        )}
+      </aside>
+    </section>
+
+    {p.shots && p.shots.length > 0 && (
+      <section class="gallery-wrap">
+        <h2 class="reveal"><span class="hash">#</span>screenshots</h2>
+        <div class="gallery">
+          {p.shots.map((s) => (
+            <a href={s.src} class="shot reveal" target="_blank" rel="noopener">
+              <img src={s.src} alt={s.alt} loading="lazy" decoding="async" />
+              <span>{s.alt}</span>
+            </a>
+          ))}
+        </div>
+      </section>
+    )}
+
+    <nav class="pager reveal" aria-label="More projects">
+      <a href={projectUrl(prev.slug)} style={`--c:${prev.color}`}><span class="label">← Previous</span><strong>{prev.name}</strong></a>
+      <a href={homeUrl('#project-file')} class="home"><span class="label">All projects</span><strong>desquerteur.com</strong></a>
+      <a href={projectUrl(next.slug)} style={`--c:${next.color}`} class="nx"><span class="label">Next →</span><strong>{next.name}</strong></a>
+    </nav>
+  </div>
+</Base>
+
+<style>
+  .page { padding: var(--s-6) 0 var(--s-7); }
+  .back { display: inline-block; font-size: 0.9rem; color: var(--muted); margin-bottom: var(--s-6); }
+  .back:hover { color: var(--teal); }
+  .phero { display: grid; grid-template-columns: auto 1fr; gap: var(--s-6); align-items: start; margin-bottom: var(--s-6); }
+  .pmark {
+    width: 112px; height: 112px; border-radius: 32px; display: grid; place-items: center;
+    background: var(--c); color: #05030b; font: 700 2.2rem var(--font-head);
+    box-shadow: 0 0 60px -10px var(--c);
+  }
+  .host { color: var(--c); margin: 0 0 6px; font-size: 0.85rem; }
+  h1 { font-size: clamp(2.2rem, 5vw, 3.8rem); font-weight: 700; letter-spacing: -0.03em; margin-bottom: var(--s-3); }
+  .tagline { font-size: 1.15rem; color: var(--muted); max-width: 44rem; }
+  .meta { display: flex; gap: var(--s-3); align-items: center; flex-wrap: wrap; margin-bottom: var(--s-5); }
+  .actions { display: flex; gap: var(--s-3); flex-wrap: wrap; }
+  .callouts { display: grid; gap: var(--s-3); margin-bottom: var(--s-6); }
+  .callout { margin: 0; padding: var(--s-3) var(--s-4); border-radius: 8px; background: rgba(18, 13, 36, 0.8); border: 1px solid var(--border); border-left: 4px solid var(--c); color: var(--muted); font-size: 0.92rem; }
+  .callout strong { color: var(--text); }
+  .video { margin-bottom: var(--s-7); }
+  .video video { width: 100%; aspect-ratio: 16 / 9; border-radius: var(--r-panel); border: 1px solid var(--border); background: #000; box-shadow: var(--lift); }
+  .vlabel { margin-top: var(--s-3); }
+  h2 { font-size: 1.4rem; margin-bottom: var(--s-4); }
+  h2 .hash { color: var(--faint); font-family: var(--font-mono); font-weight: 400; margin-right: 4px; }
+  .mt { margin-top: var(--s-6); }
+  .cols { display: grid; grid-template-columns: 1fr 320px; gap: var(--s-6); margin-bottom: var(--s-7); }
+  .about p { color: var(--muted); font-size: 1.02rem; }
+  .features { list-style: none; padding: 0; margin: 0; display: grid; gap: 10px; }
+  .features li { position: relative; padding-left: 28px; }
+  .features li::before { content: ''; position: absolute; left: 4px; top: 0.55em; width: 10px; height: 10px; border-radius: 3px; background: var(--c); box-shadow: 0 0 12px var(--c); transform: rotate(45deg); }
+  .side { align-self: start; position: sticky; top: 72px; background: rgba(11, 8, 23, 0.85); border: 1px solid var(--border); border-left: 4px solid var(--c); border-radius: var(--r-card); padding: var(--s-5); display: grid; gap: var(--s-5); }
+  .field .label { margin: 0 0 var(--s-2); }
+  .chips { list-style: none; padding: 0; margin: 0; display: flex; flex-wrap: wrap; gap: 6px; }
+  .dev { display: inline-flex; align-items: center; gap: 8px; color: var(--text); font-weight: 600; }
+  .devdot { width: 10px; height: 10px; border-radius: 50%; background: var(--teal); box-shadow: var(--glow); }
+  .small { font-size: 0.82rem; word-break: break-all; }
+  .gallery-wrap { margin-bottom: var(--s-7); }
+  .gallery { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--s-4); }
+  .shot { display: block; background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-card); overflow: hidden; color: var(--muted); font-size: 0.82rem; transition: transform 220ms var(--ease), border-color 160ms ease, opacity 600ms ease; }
+  .shot:hover { transform: translateY(-3px); border-color: var(--c); color: var(--text); }
+  .shot img { width: 100%; aspect-ratio: 16 / 10; object-fit: contain; background: #0b0817; }
+  .shot span { display: block; padding: 8px 12px; }
+  .pager { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: var(--s-4); }
+  .pager a { display: flex; flex-direction: column; gap: 4px; padding: var(--s-4) var(--s-5); border-radius: var(--r-card); background: rgba(18, 13, 36, 0.8); border: 1px solid var(--border); color: var(--text); transition: border-color 160ms ease, transform 220ms var(--ease); }
+  .pager a:hover { border-color: var(--c, var(--teal)); transform: translateY(-2px); }
+  .pager .home { text-align: center; --c: var(--teal); }
+  .pager .nx { text-align: right; }
+  @media (max-width: 900px) {
+    .cols { grid-template-columns: 1fr; }
+    .side { position: static; }
+    .gallery { grid-template-columns: repeat(2, 1fr); }
+  }
+  @media (max-width: 620px) {
+    .phero { grid-template-columns: 1fr; gap: var(--s-4); }
+    .pmark { width: 76px; height: 76px; border-radius: 22px; font-size: 1.5rem; }
+    .gallery { grid-template-columns: 1fr; }
+    .pager { grid-template-columns: 1fr; }
+    .pager .nx, .pager .home { text-align: left; }
+  }
+</style>

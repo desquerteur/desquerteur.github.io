@@ -1,0 +1,20 @@
+{
+  // Production hosting on Cloudflare: one Worker with static assets serves
+  // desquerteur.com and every <slug>.desquerteur.com project subdomain.
+  // Deploy: npm run build:subdomain && npx wrangler deploy
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "desquerteur-site",
+  "main": "worker/index.js",
+  "compatibility_date": "2026-11-01",
+  "assets": {
+    "directory": "./dist",
+    "binding": "ASSETS",
+    "not_found_handling": "404-page",
+    "run_worker_first": true
+  },
+  "routes": [
+    { "pattern": "desquerteur.com", "custom_domain": true },
+    { "pattern": "www.desquerteur.com", "custom_domain": true },
+    { "pattern": "*.desquerteur.com/*", "zone_name": "desquerteur.com" }
+  ]
+}
