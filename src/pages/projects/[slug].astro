@@ -86,6 +86,12 @@ const image = p.shots?.[0]?.src ?? p.video?.poster;
             <a href={p.repo} class="mono small">{p.repo.replace('https://github.com/', '')}</a>
           </div>
         )}
+        {hasShort && (
+          <div class="field">
+            <p class="label">Short · 0:18</p>
+            <video class="short" controls preload="none" playsinline poster={`/videos/${p.slug}-short-poster.jpg`} src={`/videos/${p.slug}-short.mp4`}></video>
+          </div>
+        )}
       </aside>
     </section>
 

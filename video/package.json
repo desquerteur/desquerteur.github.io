@@ -1,0 +1,15 @@
+{
+  "name": "desquerteur-videos",
+  "private": true,
+  "type": "commonjs",
+  "scripts": {
+    "render": "node render.cjs"
+  },
+  "dependencies": {
+    "@fontsource-variable/inter": "^5.3.0",
+    "@fontsource-variable/jetbrains-mono": "^5.3.0",
+    "@fontsource-variable/space-grotesk": "^5.3.0",
+    "ffmpeg-static": "^5.3.0",
+    "playwright-core": "^1.65.1"
+  }
+}

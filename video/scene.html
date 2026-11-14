@@ -1,0 +1,234 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<!-- Deterministic video scene: window.seek(t) draws the frame at t seconds.
+     window.SCENE (set by render.cjs) picks the mode: "tour" (16:9) or "short" (9:16). -->
+<link rel="stylesheet" href="node_modules/@fontsource-variable/inter/index.css" />
+<link rel="stylesheet" href="node_modules/@fontsource-variable/space-grotesk/index.css" />
+<link rel="stylesheet" href="node_modules/@fontsource-variable/jetbrains-mono/index.css" />
+<style>
+  :root { --bg:#05030b; --text:#f3f0ff; --muted:#a7a0c9; --faint:#6f6893; --teal:#2ee6d6; --blurple:#5865f2; --purple:#a78bfa;
+    --gradient: linear-gradient(120deg, #a78bfa, #5865f2 45%, #2ee6d6); }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: var(--W); height: var(--H); overflow: hidden; background: var(--bg); color: var(--text); font-family: 'Inter Variable', sans-serif; }
+  #stage { position: relative; width: var(--W); height: var(--H); overflow: hidden; }
+  canvas#sky { position: absolute; inset: 0; }
+  .abs { position: absolute; will-change: transform, opacity; }
+  .head { font-family: 'Space Grotesk Variable', sans-serif; font-weight: 700; letter-spacing: -0.03em; line-height: 1.02; }
+  .mono { font-family: 'JetBrains Mono Variable', monospace; }
+  .grad { background: var(--gradient); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .chrome-l { left: 56px; top: 44px; font-size: 22px; color: var(--muted); display: flex; gap: 12px; align-items: center; }
+  .chrome-l i { width: 10px; height: 10px; border-radius: 50%; background: var(--teal); box-shadow: 0 0 14px var(--teal); display: inline-block; }
+  .chrome-r { right: 56px; top: 44px; font-size: 20px; color: var(--faint); }
+  .progress { left: 56px; right: 56px; bottom: 40px; height: 4px; border-radius: 2px; background: rgba(167,139,250,.18); overflow: hidden; }
+  .progress b { display: block; height: 100%; width: 0; background: var(--gradient); }
+  .browser { border-radius: 18px; overflow: hidden; background: #0b0817; border: 1px solid rgba(167,139,250,.28);
+    box-shadow: 0 40px 120px -30px rgba(88,101,242,.7), 0 0 0 1px rgba(0,0,0,.4); }
+  .bar { height: 52px; display: flex; align-items: center; gap: 10px; padding: 0 18px; background: #120d24; border-bottom: 1px solid rgba(167,139,250,.18); }
+  .bar .d { width: 13px; height: 13px; border-radius: 50%; }
+  .url { margin-left: 18px; flex: 1; height: 32px; border-radius: 8px; background: #05030b; display: flex; align-items: center; padding: 0 14px; font-size: 17px; color: var(--muted); }
+  .url b { color: var(--text); font-weight: 600; }
+  .view { position: relative; overflow: hidden; }
+  .view img { position: absolute; left: 0; top: 0; width: 100%; }
+  .phone { border-radius: 64px; padding: 18px; background: #0b0817; border: 2px solid rgba(167,139,250,.35);
+    box-shadow: 0 50px 140px -30px rgba(88,101,242,.75); }
+  .phone .view { border-radius: 48px; }
+  .chip { display: inline-flex; align-items: center; gap: 10px; padding: 8px 16px; border-radius: 10px; background: #1a1333; border: 1px solid rgba(167,139,250,.22); color: var(--muted); font-size: 22px; }
+  .mark { display: grid; place-items: center; border-radius: 28%; color: #05030b; font-family: 'Space Grotesk Variable'; font-weight: 700; }
+  .status { display: inline-flex; align-items: center; gap: 10px; font-weight: 600; }
+  .status::before { content: ''; width: 12px; height: 12px; border-radius: 50%; background: currentColor; box-shadow: 0 0 14px currentColor; }
+</style>
+</head>
+<body>
+<div id="stage">
+  <canvas id="sky"></canvas>
+  <div id="layer"></div>
+  <div class="abs chrome-l mono"><i></i><span id="brand">desquerteur.com</span></div>
+  <div class="abs chrome-r mono" id="tc">00:00:00</div>
+  <div class="abs progress"><b id="prog"></b></div>
+</div>
+<script>
+const S = window.SCENE;
+const W = S.width, H = S.height, FPS = S.fps;
+document.documentElement.style.setProperty('--W', W + 'px');
+document.documentElement.style.setProperty('--H', H + 'px');
+const sky = document.getElementById('sky');
+sky.width = W; sky.height = H;
+const ctx = sky.getContext('2d');
+const layer = document.getElementById('layer');
+
+// ---------- helpers ----------
+const clamp = (x, a = 0, b = 1) => Math.min(b, Math.max(a, x));
+const ramp = (t, a, b) => clamp((t - a) / (b - a));
+const ease = (x) => 1 - Math.pow(1 - clamp(x), 3);
+const inOut = (x) => { x = clamp(x); return x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2; };
+// visible window [a,b] with fade in/out of length f
+const win = (t, a, b, f = 0.45) => Math.min(ease(ramp(t, a, a + f)), 1 - ease(ramp(t, b - f, b)));
+function el(html, style = '') {
+  const d = document.createElement('div');
+  d.className = 'abs';
+  d.style.cssText = style;
+  d.innerHTML = html;
+  layer.appendChild(d);
+  return d;
+}
+function show(node, o, dy = 0, sc = 1) {
+  node.style.opacity = o;
+  node.style.visibility = o <= 0.001 ? 'hidden' : 'visible';
+  node.style.transform = `translateY(${dy}px) scale(${sc})`;
+}
+function rng(seed) { return () => (seed = (seed * 1664525 + 1013904223) % 4294967296) / 4294967296; }
+const R = rng(99);
+const stars = Array.from({ length: Math.round(W * H / 4200) }, () => ({
+  x: R() * W, y: R() * H, r: R() < 0.08 ? 1.8 : R() < 0.3 ? 1.1 : 0.6,
+  s: 6 + R() * 22, tw: R() * 6.28, c: ['#ffffff', '#ffffff', '#c4b5fd', '#99f6e4', '#f5d0fe'][Math.floor(R() * 5)],
+}));
+function drawSky(t) {
+  ctx.fillStyle = '#05030b'; ctx.fillRect(0, 0, W, H);
+  const neb = [
+    [0.18 + 0.03 * Math.sin(t / 7), 0.15, 0.55, 'rgba(139,92,246,0.42)'],
+    [0.85, 0.85 + 0.03 * Math.cos(t / 9), 0.5, 'rgba(46,230,214,0.22)'],
+    [0.55, 0.5, 0.4, 'rgba(217,70,239,0.12)'],
+    [0.9, 0.18, 0.35, 'rgba(88,101,242,0.25)'],
+  ];
+  for (const [x, y, r, c] of neb) {
+    const g = ctx.createRadialGradient(x * W, y * H, 0, x * W, y * H, r * Math.max(W, H));
+    g.addColorStop(0, c); g.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+  }
+  for (const s of stars) {
+    const y = ((s.y - t * s.s) % H + H) % H;
+    ctx.globalAlpha = 0.55 + 0.45 * Math.sin(s.tw + t * 1.7);
+    ctx.fillStyle = s.c;
+    ctx.beginPath(); ctx.arc(s.x, y, s.r, 0, 6.283); ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+}
+function browser(url, img, w, h) {
+  return `<div class="browser" style="width:${w}px">
+    <div class="bar"><span class="d" style="background:#f43f5e"></span><span class="d" style="background:#f59e0b"></span><span class="d" style="background:#22c55e"></span>
+    <div class="url mono">🔒&nbsp;${url}</div></div>
+    <div class="view" style="height:${h - 52}px"><img src="${img}"></div></div>`;
+}
+function scrollImg(node, p) {
+  const v = node.querySelector('.view'), im = node.querySelector('.view img');
+  const max = Math.max(0, im.getBoundingClientRect().height / currentScale(node) - v.clientHeight);
+  im.style.transform = `translateY(${-max * p}px)`;
+}
+function currentScale(node) { return node.getBoundingClientRect().width / node.offsetWidth || 1; }
+const tc = document.getElementById('tc'), prog = document.getElementById('prog');
+function chrome(t) {
+  const f = Math.round(t * FPS), s = Math.floor(f / FPS);
+  tc.textContent = `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}:${String(f % FPS).padStart(2, '0')}`;
+  prog.style.width = `${(t / S.duration) * 100}%`;
+}
+
+// ---------- TOUR (16:9) ----------
+function buildTour() {
+  const P = S.projects;
+  const n = {};
+  n.logo = el(`<img src="${S.logo}" style="width:180px;height:180px">`, `left:${W / 2 - 90}px;top:250px`);
+  n.title = el(`<div class="head grad" style="font-size:150px;text-align:center;width:${W}px">desquerteur.com</div>`, 'left:0;top:470px');
+  n.sub = el(`<div style="font-size:40px;color:var(--muted);text-align:center;width:${W}px">Noriel · 14 · developer from Austria</div>`, 'left:0;top:660px');
+
+  n.hi = el(`<div class="head" style="font-size:110px">Hi, I'm <span class="grad">Noriel</span>.</div>
+    <div style="font-size:36px;color:var(--muted);margin-top:34px;line-height:1.45;width:640px">I build car software, Android apps, Minecraft plugins, a restaurant platform and circuit boards –<br>with <b style="color:var(--text)">Claude Code</b> &amp; <b style="color:var(--text)">Codex</b>.</div>`, 'left:120px;top:320px');
+  n.home = el(browser('<b>desquerteur.com</b>', S.cap('home-desktop-full'), 1040, 700), 'left:800px;top:190px');
+
+  n.proj = P.map((p) => {
+    const text = el(`<div class="mark" style="width:110px;height:110px;font-size:42px;background:${p.color};box-shadow:0 0 70px -10px ${p.color}">${p.mark}</div>
+      <div class="mono" style="font-size:26px;color:${p.color};margin:34px 0 14px">${p.slug}.desquerteur.com</div>
+      <div class="head" style="font-size:84px">${p.name}</div>
+      <div style="font-size:32px;color:var(--muted);margin-top:24px;line-height:1.4;width:600px">${p.tagline}</div>
+      <div class="status" style="font-size:26px;margin-top:30px;color:${p.statusColor}">${p.statusLabel}</div>`, 'left:120px;top:230px');
+    const b = el(browser(`<b>${p.slug}</b>.desquerteur.com`, S.cap(p.slug + '-desktop-full'), 1060, 720), 'left:790px;top:180px');
+    return { text, b };
+  });
+
+  n.file = el(browser('desquerteur.com<b>/projects</b>', S.cap('project-file-desktop-full'), 1300, 700), `left:${(W - 1300) / 2}px;top:300px`);
+  n.fileT = el(`<div class="head" style="font-size:72px;text-align:center;width:${W}px">${S.total} projects. <span class="grad">One subdomain each.</span></div>`, 'left:0;top:140px');
+
+  n.outLogo = el(`<img src="${S.logo}" style="width:150px;height:150px">`, `left:${W / 2 - 75}px;top:260px`);
+  n.outT = el(`<div class="head grad" style="font-size:130px;text-align:center;width:${W}px">desquerteur.com</div>`, 'left:0;top:450px');
+  n.outS = el(`<div class="mono" style="font-size:34px;color:var(--muted);text-align:center;width:${W}px">github.com/desquerteur</div>`, 'left:0;top:640px');
+  return n;
+}
+function seekTour(t, n) {
+  const P = S.projects, per = S.perProject, p0 = 11, p1 = p0 + per * P.length, f0 = p1, f1 = f0 + 6, o0 = f1;
+  // intro
+  const a = win(t, 0, 5);
+  show(n.logo, a, 0, 0.6 + 0.4 * ease(ramp(t, 0, 1.2)));
+  show(n.title, win(t, 0.6, 5), 40 * (1 - ease(ramp(t, 0.6, 1.6))));
+  show(n.sub, win(t, 1.3, 5), 30 * (1 - ease(ramp(t, 1.3, 2.2))));
+  // about + home capture
+  show(n.hi, win(t, 5, 11), 40 * (1 - ease(ramp(t, 5, 6))));
+  show(n.home, win(t, 5.3, 11), 80 * (1 - ease(ramp(t, 5.3, 6.4))));
+  scrollImg(n.home, inOut(ramp(t, 6.5, 10.6)) * 0.55);
+  // projects
+  P.forEach((p, i) => {
+    const s = p0 + i * per, e = s + per;
+    show(n.proj[i].text, win(t, s, e, 0.4), 30 * (1 - ease(ramp(t, s, s + 0.7))));
+    show(n.proj[i].b, win(t, s + 0.1, e, 0.4), 60 * (1 - ease(ramp(t, s + 0.1, s + 0.9))));
+    scrollImg(n.proj[i].b, inOut(ramp(t, s + 0.6, e - 0.2)) * 0.5);
+  });
+  // project file
+  show(n.fileT, win(t, f0, f1), 30 * (1 - ease(ramp(t, f0, f0 + 0.8))));
+  show(n.file, win(t, f0 + 0.2, f1), 60 * (1 - ease(ramp(t, f0 + 0.2, f0 + 1))));
+  scrollImg(n.file, inOut(ramp(t, f0 + 1, f1 - 0.3)) * 0.6);
+  // outro
+  show(n.outLogo, ease(ramp(t, o0, o0 + 0.8)), 0, 0.7 + 0.3 * ease(ramp(t, o0, o0 + 1)));
+  show(n.outT, ease(ramp(t, o0 + 0.3, o0 + 1.2)), 30 * (1 - ease(ramp(t, o0 + 0.3, o0 + 1.2))));
+  show(n.outS, ease(ramp(t, o0 + 0.8, o0 + 1.6)));
+}
+
+// ---------- SHORT (9:16) for one project ----------
+function buildShort() {
+  const p = S.project, n = {};
+  n.mark = el(`<div class="mark" style="width:200px;height:200px;font-size:78px;background:${p.color};box-shadow:0 0 120px -10px ${p.color}">${p.mark}</div>`, `left:${W / 2 - 100}px;top:520px`);
+  n.name = el(`<div class="head" style="font-size:${p.name.length > 16 ? 92 : 120}px;text-align:center;width:${W - 120}px">${p.name}</div>`, 'left:60px;top:800px');
+  n.tag = el(`<div style="font-size:44px;color:var(--muted);text-align:center;line-height:1.35;width:${W - 160}px">${p.tagline}</div>`, 'left:80px;top:1060px');
+  n.host = el(`<div class="mono" style="font-size:34px;color:${p.color};text-align:center;width:${W}px">${p.slug}.desquerteur.com</div>`, 'left:0;top:420px');
+
+  n.phone = el(`<div class="phone" style="width:640px"><div class="view" style="height:1120px"><img src="${S.cap(p.slug + '-phone-full')}"></div></div>`, `left:${(W - 640) / 2}px;top:150px`);
+  n.feats = p.features.slice(0, 4).map((f) => el(`<div style="display:flex;gap:22px;align-items:flex-start;width:${W - 160}px">
+      <span style="flex:none;width:22px;height:22px;margin-top:14px;border-radius:5px;transform:rotate(45deg);background:${p.color};box-shadow:0 0 20px ${p.color}"></span>
+      <span style="font-size:44px;font-weight:600;line-height:1.25">${f}</span></div>`, 'left:80px;top:1400px'));
+
+  n.endMark = el(`<div class="mark" style="width:150px;height:150px;font-size:58px;background:${p.color};box-shadow:0 0 100px -10px ${p.color}">${p.mark}</div>`, `left:${W / 2 - 75}px;top:560px`);
+  n.endT = el(`<div style="font-size:40px;color:var(--muted);text-align:center;width:${W}px">See it on</div>
+     <div class="head grad" style="font-size:${p.slug.length > 10 ? 66 : 80}px;text-align:center;width:${W}px;margin-top:20px">${p.slug}.desquerteur.com</div>
+     <div style="font-size:36px;color:var(--muted);text-align:center;width:${W}px;margin-top:60px">made by <b style="color:var(--text)">Noriel</b> · desquerteur</div>`, 'left:0;top:800px');
+  return n;
+}
+function seekShort(t, n) {
+  const D = S.duration, mid0 = 3.2, mid1 = D - 4;
+  show(n.mark, win(t, 0, mid0), 0, 0.6 + 0.4 * ease(ramp(t, 0, 0.9)));
+  show(n.host, win(t, 0.4, mid0));
+  show(n.name, win(t, 0.5, mid0), 40 * (1 - ease(ramp(t, 0.5, 1.3))));
+  show(n.tag, win(t, 0.9, mid0), 30 * (1 - ease(ramp(t, 0.9, 1.7))));
+  show(n.phone, win(t, mid0, mid1), 120 * (1 - ease(ramp(t, mid0, mid0 + 0.9))));
+  scrollImg(n.phone, inOut(ramp(t, mid0 + 0.8, mid1 - 0.4)) * 0.85);
+  const k = n.feats.length, seg = (mid1 - mid0 - 0.4) / k;
+  n.feats.forEach((f, i) => {
+    const s = mid0 + 0.4 + i * seg;
+    show(f, win(t, s, s + seg, 0.35), 30 * (1 - ease(ramp(t, s, s + 0.5))));
+  });
+  show(n.endMark, ease(ramp(t, mid1, mid1 + 0.7)), 0, 0.7 + 0.3 * ease(ramp(t, mid1, mid1 + 0.9)));
+  show(n.endT, ease(ramp(t, mid1 + 0.3, mid1 + 1.1)), 30 * (1 - ease(ramp(t, mid1 + 0.3, mid1 + 1.1))));
+}
+
+const nodes = S.mode === 'tour' ? buildTour() : buildShort();
+if (S.mode === 'short') {
+  document.querySelector('.chrome-l').style.top = '70px';
+  document.querySelector('.chrome-r').style.top = '72px';
+}
+window.seek = (t) => {
+  drawSky(t);
+  if (S.mode === 'tour') seekTour(t, nodes); else seekShort(t, nodes);
+  chrome(t);
+};
+window.ready = Promise.all([document.fonts.ready, ...[...document.images].map((i) => i.decode().catch(() => 0))]);
+</script>
+</body>
+</html>
